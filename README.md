@@ -1,7 +1,7 @@
 # Meta Wearables Device Access Toolkit for Android
 
-[![Maven](https://img.shields.io/badge/Maven-0.2.1-brightgreen?logo=apachemaven)](https://github.com/orgs/facebook/packages?repo_name=meta-wearables-dat-android)
-[![Docs](https://img.shields.io/badge/API_Reference-0.2-blue?logo=meta)](https://wearables.developer.meta.com/docs/reference/android/dat/0.2)
+[![Maven](https://img.shields.io/badge/Maven-0.3.0-brightgreen?logo=apachemaven)](https://github.com/orgs/facebook/packages?repo_name=meta-wearables-dat-android)
+[![Docs](https://img.shields.io/badge/API_Reference-0.3-blue?logo=meta)](https://wearables.developer.meta.com/docs/reference/android/dat/0.3)
 
 The Meta Wearables Device Access Toolkit enables developers to utilize Meta's AI glasses to build hands-free wearable experiences into their mobile applications.
 By integrating this SDK, developers can reliably connect to Meta's AI glasses and leverage capabilities like video streaming and photo capture.
@@ -23,29 +23,58 @@ See the [changelog](CHANGELOG.md) for the latest updates.
 
 ## Including the SDK in your project
 
-You can add the SDK to your Gradle project with these two steps:
+You can add the Wearables Device Access Toolkit to your Gradle project by following the steps below.
+You will need to provide a personal access token (classic) with at least **read:packages** scope as an environment variable named `GITHUB_TOKEN` or
+by adding it as a property named `github_token` in your `local.properties` file.
+See [SDK for Android setup](https://wearables.developer.meta.com/docs/getting-started-toolkit/#sdk-for-android-setup) for more details.
 
-### 1. Adding the repository definition to `build.gradle.kts` or `settings.gradle.kts`
+### 1. Add the repository definition to `settings.gradle.kts`
 
 ```kotlin
-repositories {
-    maven {
-        url = uri("https://maven.pkg.github.com/facebook/meta-wearables-dat-android")
-        credentials {
-            username = "" // not needed
-            password = "<access-token>"
+val localProperties =
+    Properties().apply {
+        val localPropertiesPath = rootDir.toPath() / "local.properties"
+        if (localPropertiesPath.exists()) {
+            load(localPropertiesPath.inputStream())
+        }
+    }
+
+dependencyResolutionManagement {
+    ...
+    repositories {
+        ...
+        maven {
+            url = uri("https://maven.pkg.github.com/facebook/meta-wearables-dat-android")
+            credentials {
+                username = "" // not needed
+                password = System.getenv("GITHUB_TOKEN") ?: localProperties.getProperty("github_token")
+            }
         }
     }
 }
 ```
 
-### 2. Adding the required components as dependencies in the app's `build.gradle.kts`
+### 2. Declare the Wearables Device Access Toolkit artifacts in `libs.versions.toml`
+
+Check the available versions in [GitHub Packages](https://github.com/orgs/facebook/packages?repo_name=meta-wearables-dat-android).
+
+```toml
+[versions]
+mwdat = "0.3.0"
+
+[libraries]
+mwdat-core = { group = "com.meta.wearable", name = "mwdat-core", version.ref = "mwdat" }
+mwdat-camera = { group = "com.meta.wearable", name = "mwdat-camera", version.ref = "mwdat" }
+mwdat-mockdevice = { group = "com.meta.wearable", name = "mwdat-mockdevice", version.ref = "mwdat" }
+```
+
+### 3. Add the required components as dependencies in your app's `build.gradle.kts`
 
 ```kotlin
 dependencies {
-    implementation("com.meta.wearable:mwdat-core:0.2.1")
-    implementation("com.meta.wearable:mwdat-camera:0.2.1")
-    implementation("com.meta.wearable:mwdat-mockdevice:0.2.1")
+    implementation(libs.mwdat.core)
+    implementation(libs.mwdat.camera)
+    implementation(libs.mwdat.mockdevice)
 }
 ```
 

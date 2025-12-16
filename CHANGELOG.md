@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0]
+
+### Added
+
+- [API] Result-like object (`DatResult`) used to return `Error` from some methods.
+- [API] `ALREADY_INITIALIZED` error to `WearablesError`.
+
+### Changed
+
+- [API] Updated permission functions to return `DatResult<PermissionStatus, PermissionError>` instead of `PermissionStatus`.
+- [API] In `PermissionError`, `COMPANION_APP_NOT_INSTALLED` has been renamed to `META_AI_NOT_INSTALLED`.
+- The Camera Access app streaming UX reflects device availability.
+- The Camera Access app shows errors when incompatible glasses are found.
+
+### Fixed
+
+- Fixed orientation of images caputured by `MockDevice`.
+- Streaming status is set to `stopped` if permission is not granted.
+- Fixed invalidation of flow from `Wearables.getDeviceSessionState` after streaming stops.
+- Fixed UI issues in the Camera Access app.
+
+### Removed
+
+- [API] `Error` data class from `PermissionStatus`.
+
 ## [0.2.1] - 2025-12-04
 
 ### Changed
