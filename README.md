@@ -1,4 +1,7 @@
-# Meta Wearables Device Access Toolkit for Android
+> **Note:** this repository is a fork of Meta's Android demo of "Meta Wearables Device Access Toolkit" to connect to the Meta Glasses.
+> It include an integration of Gemini Live via [Firebase AI Logic](https://firebase.google.com/docs/ai-logic/live-api). 
+
+# Meta Wearables Device Access Toolkit for Android (with Gemini Live! 🤩)
 
 [![Maven](https://img.shields.io/badge/Maven-0.3.0-brightgreen?logo=apachemaven)](https://github.com/orgs/facebook/packages?repo_name=meta-wearables-dat-android)
 [![Docs](https://img.shields.io/badge/API_Reference-0.3-blue?logo=meta)](https://wearables.developer.meta.com/docs/reference/android/dat/0.3)
