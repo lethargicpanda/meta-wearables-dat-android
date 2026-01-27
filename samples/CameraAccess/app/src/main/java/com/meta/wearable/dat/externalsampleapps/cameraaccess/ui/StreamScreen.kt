@@ -24,7 +24,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -41,6 +47,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.meta.wearable.dat.camera.types.StreamSessionState
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.R
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.stream.LiveSessionState
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.stream.StreamViewModel
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.wearables.WearablesViewModel
 
@@ -58,8 +65,12 @@ fun StreamScreen(
         ),
 ) {
   val streamUiState by streamViewModel.uiState.collectAsStateWithLifecycle()
+  val activity = LocalActivity.current as ComponentActivity
 
-  LaunchedEffect(Unit) { streamViewModel.startStream() }
+  LaunchedEffect(Unit) {
+    streamViewModel.startStream()
+    streamViewModel.initializeGeminiLive(activity)
+  }
 
   Box(modifier = modifier.fillMaxSize()) {
     streamUiState.videoFrame?.let { videoFrame ->
@@ -94,6 +105,12 @@ fun StreamScreen(
             },
             isDestructive = true,
             modifier = Modifier.weight(1f),
+        )
+
+        // Gemini Live Toggle Button
+        GeminiLiveButton(
+            liveSessionState = streamUiState.liveSessionState,
+            onClick = { streamViewModel.toggleLiveSession(activity) },
         )
 
         // Timer button
@@ -132,5 +149,36 @@ fun StreamScreen(
           },
       )
     }
+  }
+}
+
+@Composable
+fun GeminiLiveButton(
+    liveSessionState: LiveSessionState,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+  val containerColor =
+      when (liveSessionState) {
+        LiveSessionState.Running -> Color.Green
+        LiveSessionState.Ready -> Color.Blue
+        LiveSessionState.Error -> Color.Red
+        else -> Color.Gray
+      }
+
+  FilledTonalIconButton(
+      onClick = onClick,
+      modifier = modifier.size(56.dp),
+      colors =
+          IconButtonDefaults.filledTonalIconButtonColors(
+              containerColor = containerColor,
+              contentColor = Color.White,
+          ),
+      enabled = liveSessionState != LiveSessionState.NotReady,
+  ) {
+    Icon(
+        imageVector = Icons.Default.GraphicEq,
+        contentDescription = "Gemini Live",
+    )
   }
 }

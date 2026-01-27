@@ -15,6 +15,13 @@ package com.meta.wearable.dat.externalsampleapps.cameraaccess.stream
 import android.graphics.Bitmap
 import com.meta.wearable.dat.camera.types.StreamSessionState
 
+enum class LiveSessionState {
+    NotReady,
+    Ready,
+    Running,
+    Error
+}
+
 data class StreamUiState(
     val streamSessionState: StreamSessionState = StreamSessionState.STOPPED,
     val videoFrame: Bitmap? = null,
@@ -23,4 +30,5 @@ data class StreamUiState(
     val isCapturing: Boolean = false,
     val timerMode: TimerMode = TimerMode.UNLIMITED,
     val remainingTimeSeconds: Long? = null,
+    val liveSessionState: LiveSessionState = LiveSessionState.NotReady,
 )

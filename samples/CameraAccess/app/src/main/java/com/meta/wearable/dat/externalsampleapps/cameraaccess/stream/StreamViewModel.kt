@@ -17,8 +17,12 @@
 
 package com.meta.wearable.dat.externalsampleapps.cameraaccess.stream
 
+import android.Manifest
+import android.annotation.SuppressLint
+import android.app.Activity
 import android.app.Application
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.ImageFormat
@@ -26,12 +30,25 @@ import android.graphics.Matrix
 import android.graphics.Rect
 import android.graphics.YuvImage
 import android.util.Log
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.exifinterface.media.ExifInterface
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.Firebase
+import com.google.firebase.ai.ai
+import com.google.firebase.ai.type.GenerativeBackend
+import com.google.firebase.ai.type.InlineData
+import com.google.firebase.ai.type.LiveSession
+import com.google.firebase.ai.type.PublicPreviewAPI
+import com.google.firebase.ai.type.ResponseModality
+import com.google.firebase.ai.type.SpeechConfig
+import com.google.firebase.ai.type.Tool
+import com.google.firebase.ai.type.Voice
+import com.google.firebase.ai.type.liveGenerationConfig
 import com.meta.wearable.dat.camera.StreamSession
 import com.meta.wearable.dat.camera.startStreamSession
 import com.meta.wearable.dat.camera.types.PhotoData
@@ -48,12 +65,15 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
+@OptIn(PublicPreviewAPI::class)
 class StreamViewModel(
     application: Application,
     private val wearablesViewModel: WearablesViewModel,
@@ -75,6 +95,9 @@ class StreamViewModel(
   private var videoJob: Job? = null
   private var stateJob: Job? = null
   private var timerJob: Job? = null
+  
+  private var session: LiveSession? = null
+  private var geminiJob: Job? = null
 
   init {
     // Collect timer state
@@ -107,17 +130,17 @@ class StreamViewModel(
     streamTimer.startTimer()
     videoJob?.cancel()
     stateJob?.cancel()
-    val streamSession =
+    val session =
         Wearables.startStreamSession(
                 getApplication(),
                 deviceSelector,
                 StreamConfiguration(videoQuality = VideoQuality.MEDIUM, 24),
             )
             .also { streamSession = it }
-    videoJob = viewModelScope.launch { streamSession.videoStream.collect { handleVideoFrame(it) } }
+    videoJob = viewModelScope.launch { session.videoStream.collect { handleVideoFrame(it) } }
     stateJob =
         viewModelScope.launch {
-          streamSession.state.collect { currentState ->
+          session.state.collect { currentState ->
             val prevState = _uiState.value.streamSessionState
             _uiState.update { it.copy(streamSessionState = currentState) }
 
@@ -135,9 +158,13 @@ class StreamViewModel(
     videoJob = null
     stateJob?.cancel()
     stateJob = null
+    geminiJob?.cancel()
+    geminiJob = null
     streamSession?.close()
     streamSession = null
     streamTimer.stopTimer()
+    session?.stopAudioConversation()
+    session = null
     _uiState.update { INITIAL_STATE }
   }
 
@@ -350,11 +377,101 @@ class StreamViewModel(
     }
   }
 
+  @SuppressLint("MissingPermission")
+  fun toggleLiveSession(activity: Activity) {
+    viewModelScope.launch {
+      if (_uiState.value.liveSessionState == LiveSessionState.NotReady) return@launch
+
+      session?.let {
+        if (_uiState.value.liveSessionState == LiveSessionState.Ready) {
+          if (ContextCompat.checkSelfPermission(
+                  activity,
+                  Manifest.permission.RECORD_AUDIO,
+              ) == PackageManager.PERMISSION_GRANTED
+          ) {
+            it.startAudioConversation()
+            _uiState.update { it.copy(liveSessionState = LiveSessionState.Running) }
+            startGeminiFrameLoop()
+          } else {
+            requestAudioPermissionIfNeeded(activity)
+          }
+        } else {
+          it.stopAudioConversation()
+          geminiJob?.cancel()
+          _uiState.update { it.copy(liveSessionState = LiveSessionState.Ready) }
+        }
+      }
+    }
+  }
+
+  fun initializeGeminiLive(activity: Activity) {
+    requestAudioPermissionIfNeeded(activity)
+    viewModelScope.launch {
+      Log.d(TAG, "Start Gemini Live initialization")
+      val liveGenerationConfig = liveGenerationConfig {
+        speechConfig = SpeechConfig(voice = Voice("Puck"))
+        responseModality = ResponseModality.AUDIO
+      }
+
+      val generativeModel =
+          Firebase.ai(backend = GenerativeBackend.vertexAI())
+              .liveModel(
+                  "gemini-live-2.5-flash-native-audio",
+                  generationConfig = liveGenerationConfig,
+                  tools = listOf(Tool.googleSearch()),
+              )
+
+      try {
+        session = generativeModel.connect()
+        _uiState.update { it.copy(liveSessionState = LiveSessionState.Ready) }
+      } catch (e: Exception) {
+        Log.e(TAG, "Error connecting to the model", e)
+        _uiState.update { it.copy(liveSessionState = LiveSessionState.Error) }
+      }
+    }
+  }
+
+  private fun startGeminiFrameLoop() {
+    geminiJob?.cancel()
+    geminiJob =
+        viewModelScope.launch {
+          while (isActive) {
+            _uiState.value.videoFrame?.let { frame -> sendVideoFrame(frame) }
+            delay(1000)
+          }
+        }
+  }
+
+  private fun sendVideoFrame(frame: Bitmap) {
+    viewModelScope.launch {
+      val byteArrayOutputStream = ByteArrayOutputStream()
+      frame.compress(Bitmap.CompressFormat.JPEG, 50, byteArrayOutputStream)
+      val jpegBytes = byteArrayOutputStream.toByteArray()
+
+      session?.let {
+        if (_uiState.value.liveSessionState == LiveSessionState.Running) {
+          it.sendVideoRealtime(InlineData(jpegBytes, "image/jpeg"))
+        }
+      }
+    }
+  }
+
+  private fun requestAudioPermissionIfNeeded(activity: Activity) {
+    if (ContextCompat.checkSelfPermission(
+            activity,
+            Manifest.permission.RECORD_AUDIO,
+        ) != PackageManager.PERMISSION_GRANTED
+    ) {
+      ActivityCompat.requestPermissions(activity, arrayOf(Manifest.permission.RECORD_AUDIO), 1)
+    }
+  }
+
   override fun onCleared() {
     super.onCleared()
     stopStream()
     stateJob?.cancel()
     timerJob?.cancel()
+    geminiJob?.cancel()
     streamTimer.cleanup()
   }
 
