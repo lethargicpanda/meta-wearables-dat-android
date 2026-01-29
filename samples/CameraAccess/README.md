@@ -1,5 +1,5 @@
-> **Note:** this repository is a fork of Meta's Android demo of "Meta Wearables Device Access Toolkit" to connect to the Meta Glasses.
-> It include an integration of Gemini Live via [Firebase AI Logic](https://firebase.google.com/docs/ai-logic/live-api). 
+> **Note:** this repository is a fork of Meta's Android demo for the "Meta Wearables Device Access Toolkit" connecting to the Meta Glasses.
+> It includes an integration of Gemini Live via [Firebase AI Logic](https://firebase.google.com/docs/ai-logic/live-api). 
 
 # Camera Access App
 
